@@ -902,6 +902,283 @@ document.addEventListener('keydown', e => {
 });
 
 /* =========================================================
+   Backup & export
+   ========================================================= */
+function csvEscape(value) {
+  if (value === null || value === undefined) return '';
+  const s = String(value);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function buildCsv() {
+  const profile = activeProfile();
+  const { ascending: fuelRows } = computeFuelDerived();
+  const oilRows = sortChrono(activeData().oil);
+  const lines = [];
+
+  lines.push(csvEscape(`MotoLog export — ${profile.name} — ${todayISO()}`));
+  lines.push('');
+  lines.push('FUEL LOG');
+  lines.push(['Date', 'Odometer (km)', 'Fuel (L)', 'Distance (km)', 'Mileage (km/L)', 'Cost per km', 'Total cost', 'Price per L']
+    .map(csvEscape).join(','));
+  fuelRows.forEach(r => {
+    lines.push([
+      r.date,
+      r.odometer,
+      r.liters,
+      isFiniteNumber(r.distance) ? r.distance : '',
+      isFiniteNumber(r.consumption) ? r.consumption.toFixed(2) : '',
+      isFiniteNumber(r.costPerKm) ? r.costPerKm.toFixed(2) : '',
+      isFiniteNumber(r.totalCost) ? r.totalCost.toFixed(2) : '',
+      isFiniteNumber(r.pricePerLiter) ? r.pricePerLiter.toFixed(2) : '',
+    ].map(csvEscape).join(','));
+  });
+
+  lines.push('');
+  lines.push('ENGINE OIL');
+  lines.push(['Date', 'Odometer (km)', 'Interval (km)', 'Next change (km)', 'Cost', 'Brand', 'Quantity (L)']
+    .map(csvEscape).join(','));
+  oilRows.forEach(r => {
+    lines.push([
+      r.date,
+      r.odometer,
+      r.interval,
+      r.odometer + r.interval,
+      isFiniteNumber(r.cost) ? r.cost.toFixed(2) : '',
+      r.brand || '',
+      isFiniteNumber(r.quantity) ? r.quantity : '',
+    ].map(csvEscape).join(','));
+  });
+
+  return lines.join('\n');
+}
+
+function downloadFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  // Leading BOM so Excel correctly reads UTF-8 characters like ৳.
+  const csv = '\uFEFF' + buildCsv();
+  const filename = `motolog-${slugify(activeProfile().name)}-${todayISO()}.csv`;
+  downloadFile(filename, csv, 'text/csv;charset=utf-8;');
+  showToast('Excel file downloaded');
+});
+
+// Full CSV parser (handles quoted fields containing commas, quotes, or newlines) —
+// a simple split('\n') would break on any field that was quoted for that reason.
+// Also auto-detects ',' vs ';' since Excel sometimes re-saves CSVs with a
+// semicolon delimiter depending on the system's regional settings.
+function detectDelimiter(text) {
+  const headerLine = text.split(/\r?\n/).find(l => /odometer/i.test(l) || /date/i.test(l));
+  if (!headerLine) return ',';
+  const commas = (headerLine.match(/,/g) || []).length;
+  const semicolons = (headerLine.match(/;/g) || []).length;
+  return semicolons > commas ? ';' : ',';
+}
+
+function parseCsv(rawText) {
+  // Strip a leading byte-order-mark, which some editors/OSes add to UTF-8 files.
+  const text = rawText.replace(/^\uFEFF/, '');
+  const delimiter = detectDelimiter(text);
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === delimiter) {
+      row.push(field); field = '';
+    } else if (c === '\r') {
+      // ignore; row break is handled on \n
+    } else if (c === '\n') {
+      row.push(field); field = '';
+      rows.push(row); row = [];
+    } else {
+      field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function sectionRows(rows, sectionLabel) {
+  const start = rows.findIndex(r => r[0] && r[0].trim().toUpperCase().replace(/["']/g, '') === sectionLabel);
+  if (start === -1) return [];
+  const dataRows = [];
+  // start+1 is the header row; data begins at start+2 and runs until a blank row or EOF.
+  for (let i = start + 2; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r.length || r.every(cell => cell.trim() === '')) break;
+    dataRows.push(r);
+  }
+  return dataRows;
+}
+
+function parseFuelCsvRows(rows) {
+  const out = [];
+  let skipped = 0;
+  sectionRows(rows, 'FUEL LOG').forEach(r => {
+    const date = (r[0] || '').trim();
+    const odometer = parseFloat(r[1]);
+    const liters = parseFloat(r[2]);
+    const totalCostRaw = (r[6] || '').trim();
+    const priceRaw = (r[7] || '').trim();
+    if (!date || !isFiniteNumber(odometer) || odometer < 0 || !isFiniteNumber(liters) || liters <= 0) {
+      skipped++; return;
+    }
+    out.push({
+      id: uid(),
+      date,
+      odometer,
+      liters,
+      totalCost: totalCostRaw === '' ? null : parseFloat(totalCostRaw),
+      pricePerLiter: priceRaw === '' ? null : parseFloat(priceRaw),
+    });
+  });
+  return { records: out, skipped };
+}
+
+function parseOilCsvRows(rows) {
+  const out = [];
+  let skipped = 0;
+  sectionRows(rows, 'ENGINE OIL').forEach(r => {
+    const date = (r[0] || '').trim();
+    const odometer = parseFloat(r[1]);
+    const interval = parseFloat(r[2]);
+    const costRaw = (r[4] || '').trim();
+    const brand = (r[5] || '').trim();
+    const qtyRaw = (r[6] || '').trim();
+    if (!date || !isFiniteNumber(odometer) || odometer < 0 || !isFiniteNumber(interval) || interval <= 0) {
+      skipped++; return;
+    }
+    out.push({
+      id: uid(),
+      date,
+      odometer,
+      interval,
+      cost: costRaw === '' ? null : parseFloat(costRaw),
+      brand: brand || null,
+      quantity: qtyRaw === '' ? null : parseFloat(qtyRaw),
+    });
+  });
+  return { records: out, skipped };
+}
+
+document.getElementById('importCsvBtn').addEventListener('click', () => {
+  document.getElementById('importCsvInput').click();
+});
+
+document.getElementById('importCsvInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const rows = parseCsv(reader.result);
+      const fuelResult = parseFuelCsvRows(rows);
+      const oilResult = parseOilCsvRows(rows);
+
+      if (!fuelResult.records.length && !oilResult.records.length) {
+        throw new Error('No valid rows found');
+      }
+
+      const profileName = activeProfile().name;
+      const ok = window.confirm(
+        `This replaces all fuel and oil records in "${profileName}" with the contents of this file. This can't be undone. Continue?`
+      );
+      if (!ok) return;
+
+      activeData().fuel = fuelResult.records;
+      activeData().oil = oilResult.records;
+      saveData();
+      renderAll();
+
+      const skippedTotal = fuelResult.skipped + oilResult.skipped;
+      showToast(
+        `Imported ${fuelResult.records.length} fuel, ${oilResult.records.length} oil record(s)` +
+        (skippedTotal ? ` — ${skippedTotal} row(s) skipped` : '')
+      );
+    } catch (err) {
+      console.error('MotoLog CSV import failed:', err);
+      if (err && err.message === 'No valid rows found') {
+        showToast('No fuel or oil rows found — check the file has "FUEL LOG" / "ENGINE OIL" section headers.');
+      } else {
+        showToast('Could not read that file as a MotoLog Excel export.');
+      }
+    } finally {
+      e.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('exportJsonBtn').addEventListener('click', () => {
+  const json = JSON.stringify(state, null, 2);
+  downloadFile(`motolog-backup-${todayISO()}.json`, json, 'application/json');
+  showToast('Backup downloaded');
+});
+
+document.getElementById('importJsonBtn').addEventListener('click', () => {
+  document.getElementById('importJsonInput').click();
+});
+
+document.getElementById('importJsonInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!Array.isArray(parsed.profiles) || !parsed.profiles.length || !parsed.data) {
+        throw new Error('Invalid backup file');
+      }
+      const ok = window.confirm('This replaces all current data on this device with the backup file. This can\'t be undone. Continue?');
+      if (!ok) return;
+
+      state.profiles = parsed.profiles;
+      state.data = parsed.data;
+      state.activeProfileId = parsed.activeProfileId;
+      state.profiles.forEach(p => { if (!state.data[p.id]) state.data[p.id] = emptyProfileData(); });
+      if (!state.activeProfileId || !state.profiles.some(p => p.id === state.activeProfileId)) {
+        state.activeProfileId = state.profiles[0].id;
+      }
+
+      saveData();
+      renderProfileChip();
+      renderAll();
+      showToast('Backup restored');
+    } catch (err) {
+      showToast('That file doesn\'t look like a valid MotoLog backup.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+});
+
+/* =========================================================
    Init
    ========================================================= */
 renderAll();
