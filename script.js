@@ -293,6 +293,8 @@ function switchProfile(id) {
   if (id === state.activeProfileId) { closeSheet(profileOverlay); return; }
   state.activeProfileId = id;
   saveData();
+  document.getElementById('chartFromDate').value = '';
+  document.getElementById('chartToDate').value = '';
   renderProfileChip();
   renderProfileList();
   renderAll();
@@ -390,6 +392,8 @@ function renderOilGaugeAndBanner(currentOdometer) {
   const gaugeUnit = document.getElementById('oilGaugeUnit');
   const statusText = document.getElementById('oilStatusText');
   const banner = document.getElementById('oilBanner');
+  const statNextOilOdo = document.getElementById('statNextOilOdo');
+  const statOilRunSince = document.getElementById('statOilRunSince');
 
   const latest = getLatestOil();
   const ARC_LEN = 157;
@@ -401,11 +405,14 @@ function renderOilGaugeAndBanner(currentOdometer) {
     gaugeUnit.textContent = '';
     statusText.textContent = 'No oil change logged';
     banner.hidden = true;
+    statNextOilOdo.textContent = '—';
+    statOilRunSince.textContent = 'No oil change logged';
     return;
   }
 
   const { next, remaining } = computeOilStatusFor(latest, currentOdometer);
   const interval = latest.interval;
+  const sinceChange = isFiniteNumber(currentOdometer) ? currentOdometer - latest.odometer : null;
   const fractionUsed = isFiniteNumber(remaining) && interval > 0
     ? Math.min(Math.max((interval - remaining) / interval, 0), 1)
     : 0;
@@ -420,6 +427,9 @@ function renderOilGaugeAndBanner(currentOdometer) {
 
   const colors = { ok: 'var(--accent-2)', warn: 'var(--warning)', danger: 'var(--danger)' };
   gaugeFill.style.stroke = colors[level];
+
+  statNextOilOdo.textContent = fmtInt(next);
+  statOilRunSince.textContent = isFiniteNumber(sinceChange) ? `${fmtInt(sinceChange)} km run since last change` : '';
 
   if (!isFiniteNumber(remaining)) {
     gaugeValue.textContent = '—';
@@ -592,16 +602,38 @@ function renderOilList() {
    ========================================================= */
 function renderChart() {
   const wrap = document.getElementById('chartWrap');
+  const fromInput = document.getElementById('chartFromDate');
+  const toInput = document.getElementById('chartToDate');
+
   const { ascending } = computeFuelDerived();
-  const points = ascending
+  const allPoints = ascending
     .map(r => ({ date: r.date, value: r.consumption }))
     .filter(p => isFiniteNumber(p.value));
+
+  if (allPoints.length < 2) {
+    wrap.innerHTML = `
+      <div class="chart-empty">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 15l3.5-4 3 2.5L18 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div>Add a couple more fuel records to see your mileage trend.</div>
+      </div>`;
+    return;
+  }
+
+  // Keep the date pickers' bounds in sync with the data that actually exists.
+  const minDate = allPoints[0].date;
+  const maxDate = allPoints[allPoints.length - 1].date;
+  fromInput.min = minDate; fromInput.max = maxDate;
+  toInput.min = minDate; toInput.max = maxDate;
+
+  const fromVal = fromInput.value;
+  const toVal = toInput.value;
+  const points = allPoints.filter(p => (!fromVal || p.date >= fromVal) && (!toVal || p.date <= toVal));
 
   if (points.length < 2) {
     wrap.innerHTML = `
       <div class="chart-empty">
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 15l3.5-4 3 2.5L18 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <div>Add a couple more fuel records to see your mileage trend.</div>
+        <div>No mileage data in this date range.</div>
       </div>`;
     return;
   }
@@ -651,6 +683,14 @@ function renderChart() {
       ${xLabels}
     </svg>`;
 }
+
+document.getElementById('chartFromDate').addEventListener('change', renderChart);
+document.getElementById('chartToDate').addEventListener('change', renderChart);
+document.getElementById('chartRangeReset').addEventListener('click', () => {
+  document.getElementById('chartFromDate').value = '';
+  document.getElementById('chartToDate').value = '';
+  renderChart();
+});
 
 /* =========================================================
    Render everything
@@ -902,6 +942,51 @@ document.addEventListener('keydown', e => {
 });
 
 /* =========================================================
+   Collapsible panels
+   ========================================================= */
+const PANEL_STATE_KEY = 'motolog.panels.v1';
+
+// true = expanded. Fuel/oil open by default since they're the core content;
+// chart/data start collapsed to keep the main page uncluttered.
+function loadPanelState() {
+  try {
+    const raw = localStorage.getItem(PANEL_STATE_KEY);
+    if (raw) return { fuel: true, oil: true, chart: false, data: false, ...JSON.parse(raw) };
+  } catch (e) { /* fall through to defaults */ }
+  return { fuel: true, oil: true, chart: false, data: false };
+}
+
+const panelState = loadPanelState();
+
+function savePanelState() {
+  localStorage.setItem(PANEL_STATE_KEY, JSON.stringify(panelState));
+}
+
+function applyPanelState(key, toggleId, bodyId, collapsedLabel, expandedLabel) {
+  const btn = document.getElementById(toggleId);
+  const body = document.getElementById(bodyId);
+  const expanded = !!panelState[key];
+  body.hidden = !expanded;
+  btn.setAttribute('aria-expanded', String(expanded));
+  btn.setAttribute('aria-label', expanded ? collapsedLabel : expandedLabel);
+  btn.classList.toggle('is-open', expanded);
+}
+
+function setupCollapsible(key, toggleId, bodyId, collapsedLabel, expandedLabel) {
+  applyPanelState(key, toggleId, bodyId, collapsedLabel, expandedLabel);
+  document.getElementById(toggleId).addEventListener('click', () => {
+    panelState[key] = !panelState[key];
+    savePanelState();
+    applyPanelState(key, toggleId, bodyId, collapsedLabel, expandedLabel);
+  });
+}
+
+setupCollapsible('fuel', 'toggleFuel', 'fuelBody', 'Collapse fuel log', 'Expand fuel log');
+setupCollapsible('oil', 'toggleOil', 'oilBody', 'Collapse engine oil', 'Expand engine oil');
+setupCollapsible('chart', 'toggleChart', 'chartBody', 'Collapse mileage trend', 'Expand mileage trend');
+setupCollapsible('data', 'toggleData', 'dataBody', 'Collapse backup and export', 'Expand backup and export');
+
+/* =========================================================
    Backup & export
    ========================================================= */
 function csvEscape(value) {
@@ -1113,6 +1198,8 @@ document.getElementById('importCsvInput').addEventListener('change', e => {
       activeData().fuel = fuelResult.records;
       activeData().oil = oilResult.records;
       saveData();
+      document.getElementById('chartFromDate').value = '';
+      document.getElementById('chartToDate').value = '';
       renderAll();
 
       const skippedTotal = fuelResult.skipped + oilResult.skipped;
@@ -1166,6 +1253,8 @@ document.getElementById('importJsonInput').addEventListener('change', e => {
       }
 
       saveData();
+      document.getElementById('chartFromDate').value = '';
+      document.getElementById('chartToDate').value = '';
       renderProfileChip();
       renderAll();
       showToast('Backup restored');
