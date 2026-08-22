@@ -432,11 +432,11 @@ function renderOilGaugeAndBanner(currentOdometer) {
   if (remaining <= 0) {
     gaugeValue.textContent = fmtInt(Math.abs(remaining));
     gaugeUnit.textContent = 'km overdue';
-    statusText.textContent = `Overdue by ${fmtInt(Math.abs(remaining))} km`;
+    statusText.textContent = `Change was due at ${fmtInt(next)} km`;
   } else {
     gaugeValue.textContent = fmtInt(remaining);
     gaugeUnit.textContent = 'km left';
-    statusText.textContent = `Next change in ${fmtInt(remaining)} km`;
+    statusText.textContent = `Next change at ${fmtInt(next)} km`;
   }
 
   if (level === 'danger') {
