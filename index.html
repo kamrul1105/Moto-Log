@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MotoLog Fuel Maintenance</title>
+<title>MotoLog · Fuel &amp; Maintenance Tracker</title>
 <meta name="description" content="Track fuel mileage and engine oil changes for your motorcycle, entirely offline.">
-<meta name="theme-color" content="#10131a">
-<!--link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%8D%EF%B8%8F%3C/text%3E%3C/svg%3E"-->
+<meta name="theme-color" content="#0d1017">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
@@ -125,6 +125,34 @@
       </div>
     </div>
     <div id="chartWrap" class="chart-wrap"></div>
+  </section>
+
+  <!-- ===================== BACKUP & EXPORT ===================== -->
+  <section class="panel" aria-labelledby="dataHeading">
+    <div class="panel-header">
+      <div class="panel-heading">
+        <span class="panel-icon panel-icon--data" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v11m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <h2 id="dataHeading">Backup &amp; export</h2>
+      </div>
+    </div>
+
+    <p class="data-group-label">Excel — this profile only</p>
+    <div class="data-actions">
+      <button type="button" class="btn btn--primary btn--block" id="exportCsvBtn">Export to Excel (.csv)</button>
+      <button type="button" class="btn btn--ghost btn--block" id="importCsvBtn">Import from Excel (.csv)</button>
+      <input type="file" id="importCsvInput" accept=".csv,text/csv" hidden>
+    </div>
+    <p class="data-hint">Importing a CSV replaces this profile's fuel and oil records with the contents of the file. Use the same format the export produces.</p>
+
+    <p class="data-group-label">Full backup — every profile</p>
+    <div class="data-actions">
+      <button type="button" class="btn btn--ghost btn--block" id="exportJsonBtn">Download backup (.json)</button>
+      <button type="button" class="btn btn--ghost btn--block" id="importJsonBtn">Restore from backup</button>
+      <input type="file" id="importJsonInput" accept=".json,application/json" hidden>
+    </div>
+    <p class="data-hint">Restoring a backup replaces all profiles and all data on this device.</p>
   </section>
 
   <footer class="app-footer">
