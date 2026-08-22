@@ -282,6 +282,7 @@ button, input { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: nowrap;
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -290,6 +291,13 @@ button, input { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+
+.panel-heading h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-heading h2 {
@@ -359,8 +367,20 @@ button, input { font-family: inherit; }
 .panel-header-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
   gap: 8px;
   flex-shrink: 0;
+}
+
+@media (max-width: 380px) {
+  .panel-header-actions .btn-label {
+    display: none;
+  }
+  .panel-header-actions .btn--primary {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }
 
 .panel-toggle svg {
