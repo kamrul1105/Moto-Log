@@ -62,6 +62,12 @@
       <span class="stat-value" id="statLastMileage">—</span>
       <span class="stat-unit">km/L</span>
     </div>
+    <div class="stat-card">
+      <span class="stat-label">Next oil change</span>
+      <span class="stat-value" id="statNextOilOdo">—</span>
+      <span class="stat-unit">km</span>
+      <span class="stat-sub" id="statOilRunSince"></span>
+    </div>
     <div class="stat-card stat-card--gauge">
       <span class="stat-label">Engine oil</span>
       <div class="gauge" id="oilGauge">
@@ -87,13 +93,20 @@
         </span>
         <h2 id="fuelHeading">Fuel log</h2>
       </div>
-      <button type="button" class="btn btn--primary" id="openAddFuel">
-        <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
-        Add fuel
-      </button>
+      <div class="panel-header-actions">
+        <button type="button" class="btn btn--primary" id="openAddFuel">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          Add fuel
+        </button>
+        <button type="button" class="icon-btn panel-toggle" id="toggleFuel" aria-expanded="true" aria-controls="fuelBody" aria-label="Collapse fuel log">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
     </div>
-    <div id="fuelList" class="record-list"></div>
-    <p id="fuelEmpty" class="empty-state" hidden>No fuel records yet. Add your first fill-up to start tracking mileage.</p>
+    <div id="fuelBody" class="panel-body">
+      <div id="fuelList" class="record-list"></div>
+      <p id="fuelEmpty" class="empty-state" hidden>No fuel records yet. Add your first fill-up to start tracking mileage.</p>
+    </div>
   </section>
 
   <!-- ===================== OIL SECTION ===================== -->
@@ -105,13 +118,20 @@
         </span>
         <h2 id="oilHeading">Engine oil</h2>
       </div>
-      <button type="button" class="btn btn--primary" id="openAddOil">
-        <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
-        Add oil change
-      </button>
+      <div class="panel-header-actions">
+        <button type="button" class="btn btn--primary" id="openAddOil">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          Add oil change
+        </button>
+        <button type="button" class="icon-btn panel-toggle" id="toggleOil" aria-expanded="true" aria-controls="oilBody" aria-label="Collapse engine oil">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
     </div>
-    <div id="oilList" class="record-list"></div>
-    <p id="oilEmpty" class="empty-state" hidden>No oil changes logged yet. Add one to start tracking your service interval.</p>
+    <div id="oilBody" class="panel-body">
+      <div id="oilList" class="record-list"></div>
+      <p id="oilEmpty" class="empty-state" hidden>No oil changes logged yet. Add one to start tracking your service interval.</p>
+    </div>
   </section>
 
   <!-- ===================== MILEAGE HISTORY ===================== -->
@@ -123,8 +143,26 @@
         </span>
         <h2 id="chartHeading">Mileage trend</h2>
       </div>
+      <div class="panel-header-actions">
+        <button type="button" class="icon-btn panel-toggle" id="toggleChart" aria-expanded="false" aria-controls="chartBody" aria-label="Expand mileage trend">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
     </div>
-    <div id="chartWrap" class="chart-wrap"></div>
+    <div id="chartBody" class="panel-body">
+      <div class="chart-range-row">
+        <div class="chart-range-field">
+          <label for="chartFromDate">From</label>
+          <input type="date" id="chartFromDate">
+        </div>
+        <div class="chart-range-field">
+          <label for="chartToDate">To</label>
+          <input type="date" id="chartToDate">
+        </div>
+        <button type="button" class="btn btn--ghost chart-range-reset" id="chartRangeReset">Reset</button>
+      </div>
+      <div id="chartWrap" class="chart-wrap"></div>
+    </div>
   </section>
 
   <!-- ===================== BACKUP & EXPORT ===================== -->
@@ -136,23 +174,29 @@
         </span>
         <h2 id="dataHeading">Backup &amp; export</h2>
       </div>
+      <div class="panel-header-actions">
+        <button type="button" class="icon-btn panel-toggle" id="toggleData" aria-expanded="false" aria-controls="dataBody" aria-label="Expand backup and export">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
     </div>
+    <div id="dataBody" class="panel-body">
+      <p class="data-group-label">Excel — this profile only</p>
+      <div class="data-actions">
+        <button type="button" class="btn btn--primary btn--block" id="exportCsvBtn">Export to Excel (.csv)</button>
+        <button type="button" class="btn btn--ghost btn--block" id="importCsvBtn">Import from Excel (.csv)</button>
+        <input type="file" id="importCsvInput" accept=".csv,text/csv" hidden>
+      </div>
+      <p class="data-hint">Importing a CSV replaces this profile's fuel and oil records with the contents of the file. Use the same format the export produces.</p>
 
-    <p class="data-group-label">Excel — this profile only</p>
-    <div class="data-actions">
-      <button type="button" class="btn btn--primary btn--block" id="exportCsvBtn">Export to Excel (.csv)</button>
-      <button type="button" class="btn btn--ghost btn--block" id="importCsvBtn">Import from Excel (.csv)</button>
-      <input type="file" id="importCsvInput" accept=".csv,text/csv" hidden>
+      <p class="data-group-label">Full backup — every profile</p>
+      <div class="data-actions">
+        <button type="button" class="btn btn--ghost btn--block" id="exportJsonBtn">Download backup (.json)</button>
+        <button type="button" class="btn btn--ghost btn--block" id="importJsonBtn">Restore from backup</button>
+        <input type="file" id="importJsonInput" accept=".json,application/json" hidden>
+      </div>
+      <p class="data-hint">Restoring a backup replaces all profiles and all data on this device.</p>
     </div>
-    <p class="data-hint">Importing a CSV replaces this profile's fuel and oil records with the contents of the file. Use the same format the export produces.</p>
-
-    <p class="data-group-label">Full backup — every profile</p>
-    <div class="data-actions">
-      <button type="button" class="btn btn--ghost btn--block" id="exportJsonBtn">Download backup (.json)</button>
-      <button type="button" class="btn btn--ghost btn--block" id="importJsonBtn">Restore from backup</button>
-      <input type="file" id="importJsonInput" accept=".json,application/json" hidden>
-    </div>
-    <p class="data-hint">Restoring a backup replaces all profiles and all data on this device.</p>
   </section>
 
   <footer class="app-footer">
