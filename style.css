@@ -218,9 +218,6 @@ button, input { font-family: inherit; }
   text-align: center;
   grid-column: span 2;
 }
-@media (min-width: 420px) {
-  .stat-card--gauge { grid-column: span 1; }
-}
 
 .stat-sub {
   font-size: 12px;
@@ -359,6 +356,20 @@ button, input { font-family: inherit; }
 .icon-btn svg { width: 16px; height: 16px; }
 .icon-btn:active { transform: scale(0.92); }
 
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.panel-toggle svg {
+  transition: transform 0.2s ease;
+}
+.panel-toggle.is-open svg {
+  transform: rotate(180deg);
+}
+
 /* Empty state */
 .empty-state {
   background: var(--surface);
@@ -458,6 +469,39 @@ button, input { font-family: inherit; }
 /* =========================================================
    Chart
    ========================================================= */
+.chart-range-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.chart-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 130px;
+}
+.chart-range-field label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-faint);
+}
+.chart-range-field input[type="date"] {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+}
+.chart-range-reset {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+}
+
 .chart-wrap {
   background: var(--surface);
   border: 1px solid var(--border-soft);
@@ -775,7 +819,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6); cur
 @media (min-width: 720px) {
   .app { padding: 40px 24px 60px; }
   .dashboard { grid-template-columns: repeat(4, 1fr); gap: 14px; }
-  .stat-card--gauge { grid-column: span 1; }
+  .stat-card--gauge { grid-column: span 4; }
   .stat-value { font-size: 28px; }
   .record-card { padding: 16px 18px; }
   .record-grid { grid-template-columns: repeat(4, 1fr); }
