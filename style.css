@@ -794,3 +794,38 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6); cur
 @media (min-width: 480px) {
   .field-row { gap: 14px; }
 }
+
+/* =========================================================
+   Backup & export panel
+   ========================================================= */
+.panel-icon--data { background: #a78bfa26; color: #b9a3ff; }
+
+.data-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.data-group-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  margin: 4px 2px 8px;
+}
+.panel > .data-group-label:not(:first-of-type) {
+  margin-top: 18px;
+}
+
+.data-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 12px 2px 0;
+  line-height: 1.5;
+}
+
+@media (min-width: 480px) {
+  .data-actions { flex-direction: row; flex-wrap: wrap; }
+  .data-actions .btn { flex: 1 1 auto; min-width: 160px; }
+}
