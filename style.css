@@ -383,6 +383,24 @@ button, input { font-family: inherit; }
   }
 }
 
+/* Smooth collapse/expand: animating max-height needs a fixed target, but this
+   "grid-rows" trick animates a fractional row (1fr -> 0fr) so it auto-fits
+   whatever content is inside, even after the content's own height changes. */
+.panel-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.32s ease, opacity 0.28s ease;
+  opacity: 1;
+}
+.panel-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.panel-body.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
 .panel-toggle svg {
   transition: transform 0.2s ease;
 }
@@ -878,7 +896,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6); cur
   color: var(--text-faint);
   margin: 4px 2px 8px;
 }
-.panel > .data-group-label:not(:first-of-type) {
+.panel-body-inner > .data-group-label:not(:first-of-type) {
   margin-top: 18px;
 }
 
