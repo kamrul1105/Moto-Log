@@ -110,6 +110,43 @@ function fmtInt(n) {
   return Math.round(n).toLocaleString('en-US');
 }
 
+// Animates a stat number counting up (or down) from whatever it last showed
+// to a new value. Tracks each element's current value on a WeakMap "token"
+// so that if a new call comes in mid-animation (e.g. a fast double-render),
+// the older animation loop notices and stops instead of fighting the new one.
+const animateValueTokens = new WeakMap();
+
+function animateValue(el, toValue, decimals = 0, duration = 700) {
+  if (!isFiniteNumber(toValue)) {
+    animateValueTokens.set(el, (animateValueTokens.get(el) || 0) + 1);
+    el.textContent = '—';
+    el.dataset.rawValue = '0';
+    return;
+  }
+
+  const from = parseFloat(el.dataset.rawValue || '0');
+  el.dataset.rawValue = String(toValue);
+
+  if (from === toValue) {
+    el.textContent = decimals > 0 ? fmt(toValue, decimals) : fmtInt(toValue);
+    return;
+  }
+
+  const token = (animateValueTokens.get(el) || 0) + 1;
+  animateValueTokens.set(el, token);
+  const startTime = performance.now();
+
+  function tick(now) {
+    if (animateValueTokens.get(el) !== token) return; // superseded by a newer render
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+    const current = from + (toValue - from) * eased;
+    el.textContent = decimals > 0 ? fmt(current, decimals) : fmtInt(current);
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
 function fmtMoney(n) {
   if (!isFiniteNumber(n)) return '—';
   return '৳' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -379,12 +416,16 @@ function renderDashboard() {
   const currentOdometer = getCurrentOdometer();
   const { avgMileage, lastMileage } = computeFuelDerived();
 
-  document.getElementById('statOdometer').textContent = isFiniteNumber(currentOdometer) ? fmtInt(currentOdometer) : '—';
-  document.getElementById('statAvgMileage').textContent = fmt(avgMileage, 1);
-  document.getElementById('statLastMileage').textContent = fmt(lastMileage, 1);
+  animateValue(document.getElementById('statOdometer'), currentOdometer, 0);
+  animateValue(document.getElementById('statAvgMileage'), avgMileage, 1);
+  animateValue(document.getElementById('statLastMileage'), lastMileage, 1);
 
   renderOilGaugeAndBanner(currentOdometer);
 }
+
+// True until the gauge has painted once — lets the very first render start the
+// arc empty and sweep in, instead of appearing already at its final position.
+let gaugeFirstRender = true;
 
 function renderOilGaugeAndBanner(currentOdometer) {
   const gaugeFill = document.getElementById('gaugeFill');
@@ -398,14 +439,32 @@ function renderOilGaugeAndBanner(currentOdometer) {
   const latest = getLatestOil();
   const ARC_LEN = 157;
 
+  function setGaugeOffset(offset) {
+    if (gaugeFirstRender) {
+      gaugeFirstRender = false;
+      // Force the arc to start fully empty with no transition, let the browser
+      // paint that, then animate to the real value on the next frame — this is
+      // what makes it visibly "sweep in" on first load rather than just appear.
+      gaugeFill.style.transition = 'none';
+      gaugeFill.style.strokeDashoffset = String(ARC_LEN);
+      void gaugeFill.offsetWidth; // force a reflow so the empty state actually paints
+      gaugeFill.style.transition = '';
+      requestAnimationFrame(() => {
+        gaugeFill.style.strokeDashoffset = String(offset);
+      });
+    } else {
+      gaugeFill.style.strokeDashoffset = String(offset);
+    }
+  }
+
   if (!latest) {
-    gaugeFill.style.strokeDashoffset = ARC_LEN;
+    setGaugeOffset(ARC_LEN);
     gaugeFill.style.stroke = 'var(--surface-3)';
     gaugeValue.textContent = '—';
     gaugeUnit.textContent = '';
     statusText.textContent = 'No oil change logged';
     banner.hidden = true;
-    statNextOilOdo.textContent = '—';
+    animateValue(statNextOilOdo, null);
     statOilRunSince.textContent = 'No oil change logged';
     return;
   }
@@ -417,7 +476,7 @@ function renderOilGaugeAndBanner(currentOdometer) {
     ? Math.min(Math.max((interval - remaining) / interval, 0), 1)
     : 0;
 
-  gaugeFill.style.strokeDashoffset = String(ARC_LEN * (1 - fractionUsed));
+  setGaugeOffset(ARC_LEN * (1 - fractionUsed));
 
   const warnThreshold = Math.min(300, interval * 0.15);
   let level = 'ok';
@@ -428,7 +487,7 @@ function renderOilGaugeAndBanner(currentOdometer) {
   const colors = { ok: 'var(--accent-2)', warn: 'var(--warning)', danger: 'var(--danger)' };
   gaugeFill.style.stroke = colors[level];
 
-  statNextOilOdo.textContent = fmtInt(next);
+  animateValue(statNextOilOdo, next);
   statOilRunSince.textContent = isFiniteNumber(sinceChange) ? `${fmtInt(sinceChange)} km run since last change` : '';
 
   if (!isFiniteNumber(remaining)) {
@@ -440,11 +499,11 @@ function renderOilGaugeAndBanner(currentOdometer) {
   }
 
   if (remaining <= 0) {
-    gaugeValue.textContent = fmtInt(Math.abs(remaining));
+    animateValue(gaugeValue, Math.abs(remaining));
     gaugeUnit.textContent = 'km overdue';
     statusText.textContent = `Change was due at ${fmtInt(next)} km`;
   } else {
-    gaugeValue.textContent = fmtInt(remaining);
+    animateValue(gaugeValue, remaining);
     gaugeUnit.textContent = 'km left';
     statusText.textContent = `Next change at ${fmtInt(next)} km`;
   }
@@ -966,7 +1025,7 @@ function applyPanelState(key, toggleId, bodyId, collapsedLabel, expandedLabel) {
   const btn = document.getElementById(toggleId);
   const body = document.getElementById(bodyId);
   const expanded = !!panelState[key];
-  body.hidden = !expanded;
+  body.classList.toggle('is-collapsed', !expanded);
   btn.setAttribute('aria-expanded', String(expanded));
   btn.setAttribute('aria-label', expanded ? collapsedLabel : expandedLabel);
   btn.classList.toggle('is-open', expanded);
